@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">وَنَس</string>
+    <string name="app_tagline">وَنَس — الناس للناس • اتكلم • اسمع • اتعرف</string>
+    <string name="create_room_title">إنشاء غرفة دردشة جديدة</string>
+    <string name="room_name_label">اسم الغرفة (Room Name)</string>
+    <string name="creator_id_label">معرف المنشئ (Creator ID)</string>
+    <string name="create_room_button">حفظ الغرفة في Firestore</string>
+    <string name="sign_in_google_button">تسجيل الدخول عبر Google</string>
+</resources>

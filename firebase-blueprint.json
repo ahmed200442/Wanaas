@@ -1,0 +1,358 @@
+{
+  "entities": {
+    "ChatRoomMetadata": {
+      "title": "ChatRoomMetadata",
+      "description": "Metadata for a chat room stored in Firestore including room name, creator ID, and server timestamp. Clients must submit FieldValue.serverTimestamp() for timestamp.",
+      "type": "object",
+      "properties": {
+        "roomId": {
+          "type": "string",
+          "description": "Unique identifier of the chat room document."
+        },
+        "roomName": {
+          "type": "string",
+          "description": "Display name of the chat room."
+        },
+        "creatorId": {
+          "type": "string",
+          "description": "UID of the authenticated user who created the chat room."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation server timestamp (submitted via FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "roomId",
+        "roomName",
+        "creatorId",
+        "timestamp"
+      ]
+    },
+    "MemberProfile": {
+      "title": "MemberProfile",
+      "description": "Public member account profile linked to Supabase and Firestore, including custom avatar URI/URL and personal statistics.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated user UID."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Member display name shown in rooms."
+        },
+        "avatarEmoji": {
+          "type": "string",
+          "description": "Member avatar icon or emoji."
+        },
+        "avatarUri": {
+          "type": "string",
+          "description": "Custom avatar image URI or URL."
+        },
+        "bio": {
+          "type": "string",
+          "description": "Short personal bio or status message."
+        },
+        "roleBadge": {
+          "type": "string",
+          "description": "Member badge label."
+        },
+        "roomsCreatedCount": {
+          "type": "integer",
+          "description": "Total chat rooms created by this member."
+        },
+        "roomsJoinedCount": {
+          "type": "integer",
+          "description": "Total room entries by this member."
+        },
+        "messagesSentCount": {
+          "type": "integer",
+          "description": "Total chat messages or activity entries sent by this member."
+        },
+        "supabaseSynced": {
+          "type": "boolean",
+          "description": "Whether the member account is linked and synced with Supabase."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the last profile update."
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "avatarEmoji",
+        "roleBadge",
+        "supabaseSynced",
+        "updatedAt"
+      ]
+    },
+    "MemberChatHistoryEntry": {
+      "title": "MemberChatHistoryEntry",
+      "description": "Personal chat history or room activity entry for a member.",
+      "type": "object",
+      "properties": {
+        "entryId": {
+          "type": "string",
+          "description": "Unique identifier of the chat history item."
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the member who owns this history item."
+        },
+        "roomId": {
+          "type": "string",
+          "description": "ID of the chat room."
+        },
+        "roomName": {
+          "type": "string",
+          "description": "Display name of the chat room."
+        },
+        "messageText": {
+          "type": "string",
+          "description": "Message text or activity summary."
+        },
+        "activityType": {
+          "type": "string",
+          "enum": [
+            "MESSAGE",
+            "JOIN_ROOM",
+            "CREATE_ROOM",
+            "LEAVE_ROOM"
+          ],
+          "description": "Type of chat or room history event."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the chat history entry."
+        }
+      },
+      "required": [
+        "entryId",
+        "userId",
+        "roomId",
+        "roomName",
+        "messageText",
+        "activityType",
+        "timestamp"
+      ]
+    },
+    "RoomActiveMember": {
+      "title": "RoomActiveMember",
+      "description": "Active member currently present inside a chat room.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the member inside the room."
+        },
+        "roomId": {
+          "type": "string",
+          "description": "Room ID that the member joined."
+        },
+        "memberName": {
+          "type": "string",
+          "description": "Display name of the member inside the room."
+        },
+        "avatarEmoji": {
+          "type": "string",
+          "description": "Avatar emoji of the member."
+        },
+        "roleBadge": {
+          "type": "string",
+          "description": "Badge of the member in the room."
+        },
+        "supabaseLinked": {
+          "type": "boolean",
+          "description": "Whether the member account is linked to Supabase."
+        },
+        "joinedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the member entered the room."
+        }
+      },
+      "required": [
+        "userId",
+        "roomId",
+        "memberName",
+        "avatarEmoji",
+        "roleBadge",
+        "supabaseLinked",
+        "joinedAt"
+      ]
+    },
+    "RoomPresenceBannerEvent": {
+      "title": "RoomPresenceBannerEvent",
+      "description": "Transient room entry/exit event banner ('دخل العضو فلان' / 'خرج العضو فلان').",
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "description": "Unique event identifier."
+        },
+        "roomId": {
+          "type": "string",
+          "description": "Room ID where the entry or exit occurred."
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the member who entered or left."
+        },
+        "memberName": {
+          "type": "string",
+          "description": "Display name of the member."
+        },
+        "avatarEmoji": {
+          "type": "string",
+          "description": "Avatar emoji of the member."
+        },
+        "eventType": {
+          "type": "string",
+          "enum": [
+            "JOIN",
+            "LEAVE"
+          ],
+          "description": "JOIN when entering the room, LEAVE when exiting."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the event."
+        }
+      },
+      "required": [
+        "eventId",
+        "roomId",
+        "userId",
+        "memberName",
+        "avatarEmoji",
+        "eventType",
+        "createdAt"
+      ]
+    },
+    "AnonymousFadfadaPost": {
+      "title": "AnonymousFadfadaPost",
+      "description": "Public anonymous venting ('فضفضة بدون اسم') post visible to all members without author name or email.",
+      "type": "object",
+      "properties": {
+        "postId": {
+          "type": "string",
+          "description": "Unique identifier of the venting post."
+        },
+        "authorId": {
+          "type": "string",
+          "description": "UID of the member who created the post."
+        },
+        "content": {
+          "type": "string",
+          "description": "Venting message content."
+        },
+        "moodTag": {
+          "type": "string",
+          "description": "Mood or emotion tag chosen by the user."
+        },
+        "heartsCount": {
+          "type": "integer",
+          "description": "Supportive hearts count."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the post was published."
+        }
+      },
+      "required": [
+        "postId",
+        "authorId",
+        "content",
+        "moodTag",
+        "heartsCount",
+        "timestamp"
+      ]
+    },
+    "FadfadaAdminIdentity": {
+      "title": "FadfadaAdminIdentity",
+      "description": "Admin-only identity record for an anonymous venting post containing the author's real display name and email, readable only by the app owner/admin.",
+      "type": "object",
+      "properties": {
+        "postId": {
+          "type": "string",
+          "description": "Matching ID of the venting post."
+        },
+        "authorId": {
+          "type": "string",
+          "description": "UID of the member who created the post."
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Real display name of the member visible only to the app owner/admin."
+        },
+        "authorEmail": {
+          "type": "string",
+          "description": "Email address of the member visible only to the app owner/admin."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the identity record was stored."
+        }
+      },
+      "required": [
+        "postId",
+        "authorId",
+        "authorName",
+        "authorEmail",
+        "timestamp"
+      ]
+    }
+  },
+  "firestore": {
+    "/chat_rooms/{roomId}": {
+      "schema": {
+        "$ref": "#/entities/ChatRoomMetadata"
+      },
+      "description": "Collection storing chat room metadata documents."
+    },
+    "/members/{userId}": {
+      "schema": {
+        "$ref": "#/entities/MemberProfile"
+      },
+      "description": "Public member profiles linked with Supabase."
+    },
+    "/members/{userId}/chat_history/{entryId}": {
+      "schema": {
+        "$ref": "#/entities/MemberChatHistoryEntry"
+      },
+      "description": "Member personal chat and room activity history."
+    },
+    "/chat_rooms/{roomId}/active_members/{memberId}": {
+      "schema": {
+        "$ref": "#/entities/RoomActiveMember"
+      },
+      "description": "Live list of members currently present inside a chat room."
+    },
+    "/chat_rooms/{roomId}/presence_events/{eventId}": {
+      "schema": {
+        "$ref": "#/entities/RoomPresenceBannerEvent"
+      },
+      "description": "Live stream of join and leave notifications inside a chat room."
+    },
+    "/fadfada_posts/{postId}": {
+      "schema": {
+        "$ref": "#/entities/AnonymousFadfadaPost"
+      },
+      "description": "Anonymous venting posts ('فضفضة بدون اسم') without PII."
+    },
+    "/fadfada_admin_identities/{postId}": {
+      "schema": {
+        "$ref": "#/entities/FadfadaAdminIdentity"
+      },
+      "description": "Admin-only collection storing the real name and email of the venting author for the app owner."
+    }
+  }
+}

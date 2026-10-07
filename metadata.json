@@ -1,0 +1,6 @@
+{
+  "name": "وَنَس",
+  "description": "وَنَس — الناس للناس | اتكلم • اسمع • اتعرف عبر جلسات صوتية ذكية وغرف تفاعلية آمنة",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
