@@ -112,7 +112,6 @@ import com.example.notifications.PushNotificationHelper
 import com.example.ui.screens.FadfadaAnonymousScreen
 import com.example.ui.screens.PushNotificationsAndPaymentScreen
 import com.example.ui.screens.UserProfileScreen
-import com.example.ui.screens.WanasV4HubScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.WanasAmberGold
 import com.example.ui.theme.WanasCardBg
@@ -632,11 +631,10 @@ fun ChatRoomMetadataScreen(
     var showProfileView by rememberSaveable { mutableStateOf(false) }
     var showFadfadaView by rememberSaveable { mutableStateOf(false) }
     var showNotificationsPaymentView by rememberSaveable { mutableStateOf(false) }
-    var showV4View by rememberSaveable { mutableStateOf(false) }
     var notificationsPaymentInitialTab by rememberSaveable { mutableStateOf(0) }
 
     // Handle system Back press when inside an active room
-    if (actionState.activeRoom != null && !showProfileView && !showFadfadaView && !showNotificationsPaymentView && !showV4View) {
+    if (actionState.activeRoom != null && !showProfileView && !showFadfadaView && !showNotificationsPaymentView) {
         BackHandler {
             viewModel.leaveCurrentRoom()
         }
@@ -666,12 +664,7 @@ fun ChatRoomMetadataScreen(
                 .background(screenBackgroundBrush)
                 .padding(innerPadding)
         ) {
-            if (showV4View) {
-                WanasV4HubScreen(
-                    currentUserName = actionState.memberDisplayName.ifBlank { currentUserDisplayName },
-                    onBack = { showV4View = false }
-                )
-            } else if (showProfileView) {
+            if (showProfileView) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1004,7 +997,7 @@ fun ChatRoomMetadataScreen(
 
                                     // V4 Modern Hub: AI + Smart Rooms + Messenger + Games + Friends + Voice + Economy
                                     FilledTonalButton(
-                                        onClick = { showV4View = true },
+                                        onClick = { context.startActivity(android.content.Intent(context, WanasV4Activity::class.java)) },
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(46.dp)
