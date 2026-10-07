@@ -309,6 +309,130 @@
         "authorEmail",
         "timestamp"
       ]
+    },
+    "PushNotificationEvent": {
+      "title": "PushNotificationEvent",
+      "description": "Real-time push notification event triggered on a new chat message or friend room invitation.",
+      "type": "object",
+      "properties": {
+        "notificationId": {
+          "type": "string",
+          "description": "Unique identifier of the push notification event."
+        },
+        "senderId": {
+          "type": "string",
+          "description": "UID of the member who sent the message or invitation."
+        },
+        "senderName": {
+          "type": "string",
+          "description": "Display name of the sender."
+        },
+        "recipientQuery": {
+          "type": "string",
+          "description": "Target friend name, email, or 'ALL' for room broadcast."
+        },
+        "roomId": {
+          "type": "string",
+          "description": "ID of the chat room."
+        },
+        "roomName": {
+          "type": "string",
+          "description": "Display name of the chat room."
+        },
+        "notificationType": {
+          "type": "string",
+          "enum": [
+            "NEW_MESSAGE",
+            "ROOM_INVITE"
+          ],
+          "description": "Type of push notification."
+        },
+        "messageBody": {
+          "type": "string",
+          "description": "Message preview or invitation text."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the notification."
+        }
+      },
+      "required": [
+        "notificationId",
+        "senderId",
+        "senderName",
+        "recipientQuery",
+        "roomId",
+        "roomName",
+        "notificationType",
+        "messageBody",
+        "timestamp"
+      ]
+    },
+    "VerifiedPaymentReceipt": {
+      "title": "VerifiedPaymentReceipt",
+      "description": "Verified payment receipt required before unlocking VIP features or paid actions.",
+      "type": "object",
+      "properties": {
+        "receiptId": {
+          "type": "string",
+          "description": "Unique receipt ID."
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the member who completed the payment."
+        },
+        "memberName": {
+          "type": "string",
+          "description": "Display name of the paying member."
+        },
+        "planId": {
+          "type": "string",
+          "description": "Selected subscription or package ID."
+        },
+        "planTitle": {
+          "type": "string",
+          "description": "Display title of the paid package."
+        },
+        "amountEgp": {
+          "type": "integer",
+          "description": "Paid amount in EGP."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": [
+            "BANK_CARD",
+            "VODAFONE_CASH",
+            "INSTAPAY"
+          ],
+          "description": "Payment method used."
+        },
+        "transactionReference": {
+          "type": "string",
+          "description": "Masked card last-4 or wallet/InstaPay reference number."
+        },
+        "verified": {
+          "type": "boolean",
+          "description": "True only after payment validation succeeds."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the payment."
+        }
+      },
+      "required": [
+        "receiptId",
+        "userId",
+        "memberName",
+        "planId",
+        "planTitle",
+        "amountEgp",
+        "paymentMethod",
+        "transactionReference",
+        "verified",
+        "timestamp"
+      ]
     }
   },
   "firestore": {
@@ -353,6 +477,18 @@
         "$ref": "#/entities/FadfadaAdminIdentity"
       },
       "description": "Admin-only collection storing the real name and email of the venting author for the app owner."
+    },
+    "/push_notifications/{notificationId}": {
+      "schema": {
+        "$ref": "#/entities/PushNotificationEvent"
+      },
+      "description": "Real-time push notifications for new messages and friend room invitations."
+    },
+    "/payment_receipts/{receiptId}": {
+      "schema": {
+        "$ref": "#/entities/VerifiedPaymentReceipt"
+      },
+      "description": "Verified payment receipts for VIP memberships and paid features."
     }
   }
 }

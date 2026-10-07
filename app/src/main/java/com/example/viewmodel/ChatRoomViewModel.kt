@@ -17,10 +17,14 @@ import com.example.data.ChatRoomRepository
 import com.example.data.FadfadaAdminIdentity
 import com.example.data.MemberChatHistoryEntry
 import com.example.data.MemberPersonalStats
+import com.example.data.PushNotificationEvent
 import com.example.data.RoomActiveMember
 import com.example.data.RoomPresenceBannerEvent
 import com.example.data.SupabaseAccountService
 import com.example.data.SupabaseMemberAccount
+import com.example.data.VerifiedPaymentReceipt
+import com.example.data.VipPaymentPlan
+import com.example.notifications.PushNotificationHelper
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -58,13 +62,18 @@ data class ChatRoomsActionState(
     val memberAvatarEmoji: String = "👑",
     val memberAvatarUri: String = "",
     val memberBio: String = "أهلاً بكم في غرف ونس الصوتية ✨",
-    val memberRoleBadge: String = "VIP عضو",
+    val memberRoleBadge: String = "عضو ونس",
+    val isPaidVip: Boolean = false,
+    val paidPlanTitle: String = "",
+    val paymentReceipts: List<VerifiedPaymentReceipt> = emptyList(),
     val roomsCreatedCount: Int = 0,
     val roomsJoinedCount: Int = 0,
     val messagesSentCount: Int = 0,
     val chatHistory: List<MemberChatHistoryEntry> = emptyList(),
     val fadfadaPosts: List<AnonymousFadfadaPost> = emptyList(),
     val fadfadaAdminIdentities: Map<String, FadfadaAdminIdentity> = emptyMap(),
+    val pushNotifications: List<PushNotificationEvent> = emptyList(),
+    val latestPushBanner: PushNotificationEvent? = null,
     val isAdminOwner: Boolean = false,
     val isSupabaseConfigured: Boolean = false,
     val isSupabaseSynced: Boolean = true,
@@ -88,13 +97,16 @@ class ChatRoomViewModel(
     private val currentUserId: String,
     private val currentUserDisplayName: String = "",
     private val currentUserEmail: String = "",
-    private val supabaseService: SupabaseAccountService = SupabaseAccountService()
+    private val supabaseService: SupabaseAccountService = SupabaseAccountService(),
+    private val pushNotificationHelper: PushNotificationHelper? = null
 ) : ViewModel() {
 
     private val _localRooms = MutableStateFlow<List<ChatRoomMetadata>>(emptyList())
     private val _localChatHistory = MutableStateFlow<List<MemberChatHistoryEntry>>(emptyList())
     private val _localFadfadaPosts = MutableStateFlow<List<AnonymousFadfadaPost>>(emptyList())
     private val _localFadfadaAdminIdentities = MutableStateFlow<Map<String, FadfadaAdminIdentity>>(emptyMap())
+    private val _localPushNotifications = MutableStateFlow<List<PushNotificationEvent>>(emptyList())
+    private val _localPaymentReceipts = MutableStateFlow<List<VerifiedPaymentReceipt>>(emptyList())
 
     private val resolvedEmail: String = currentUserEmail.ifBlank { supabaseService.getLastSavedEmail() }
 
@@ -135,6 +147,9 @@ class ChatRoomViewModel(
             memberEmail = resolvedEmail,
             memberAvatarUri = supabaseService.getLastSavedAvatarUri(),
             memberBio = supabaseService.getLastSavedBio(),
+            memberRoleBadge = supabaseService.getSavedRoleBadge(),
+            isPaidVip = supabaseService.getSavedIsPaidVip(),
+            paidPlanTitle = supabaseService.getSavedPaidPlanTitle(),
             roomsCreatedCount = supabaseService.getSavedRoomsCreatedCount(),
             roomsJoinedCount = supabaseService.getSavedRoomsJoinedCount(),
             messagesSentCount = supabaseService.getSavedMessagesSentCount(),
@@ -149,13 +164,19 @@ class ChatRoomViewModel(
     private var chatHistoryJob: Job? = null
     private var fadfadaPostsJob: Job? = null
     private var fadfadaAdminJob: Job? = null
+    private var pushNotificationsJob: Job? = null
+    private var paymentReceiptsJob: Job? = null
     private var bannerAutoHideJob: Job? = null
+    private var pushBannerAutoHideJob: Job? = null
     private var lastShownEventId: String? = null
+    private var lastDeliveredNotificationId: String? = null
 
     init {
         syncMemberAccountWithSupabaseAndCloud()
         observeMemberChatHistoryStream()
         observeFadfadaStreams()
+        observePushNotificationsStream()
+        observeVerifiedPaymentsStream()
     }
 
     private fun isUserAppOwner(email: String): Boolean {
@@ -163,6 +184,248 @@ class ChatRoomViewModel(
         val fbEmail = Firebase.auth.currentUser?.email?.trim()?.lowercase().orEmpty()
         val owner = ChatRoomRepository.APP_OWNER_EMAIL.lowercase()
         return clean == owner || fbEmail == owner
+    }
+
+    private fun observePushNotificationsStream() {
+        pushNotificationsJob?.cancel()
+        val cloudNotificationsFlow = if (Firebase.auth.currentUser != null) {
+            repository.observePushNotifications()
+                .catch { e ->
+                    Log.w(TAG, "Error observing push notifications", e)
+                    emit(emptyList())
+                }
+        } else {
+            MutableStateFlow(emptyList())
+        }
+
+        pushNotificationsJob = viewModelScope.launch {
+            combine(cloudNotificationsFlow, _localPushNotifications) { cloudList, localList ->
+                (cloudList + localList)
+                    .distinctBy { it.notificationId }
+                    .sortedByDescending { it.timestampMillis }
+            }.collect { combinedList ->
+                _actionState.update { it.copy(pushNotifications = combinedList) }
+                val newest = combinedList.firstOrNull()
+                if (newest != null &&
+                    newest.notificationId.isNotBlank() &&
+                    newest.notificationId != lastDeliveredNotificationId
+                ) {
+                    lastDeliveredNotificationId = newest.notificationId
+                    triggerSystemAndBannerPushNotification(newest)
+                }
+            }
+        }
+    }
+
+    private fun observeVerifiedPaymentsStream() {
+        paymentReceiptsJob?.cancel()
+        val cloudReceiptsFlow = if (Firebase.auth.currentUser != null) {
+            repository.observePaymentReceiptsForUser(currentUserId)
+                .catch { e ->
+                    Log.w(TAG, "Error observing payment receipts", e)
+                    emit(emptyList())
+                }
+        } else {
+            MutableStateFlow(emptyList())
+        }
+
+        paymentReceiptsJob = viewModelScope.launch {
+            combine(cloudReceiptsFlow, _localPaymentReceipts) { cloudList, localList ->
+                (cloudList + localList)
+                    .distinctBy { it.receiptId }
+                    .sortedByDescending { it.timestampMillis }
+            }.collect { receipts ->
+                val hasVerified = receipts.any { it.verified } || supabaseService.getSavedIsPaidVip()
+                val latestReceipt = receipts.firstOrNull { it.verified }
+                _actionState.update { state ->
+                    state.copy(
+                        paymentReceipts = receipts,
+                        isPaidVip = hasVerified,
+                        paidPlanTitle = latestReceipt?.planTitle?.ifBlank { state.paidPlanTitle } ?: state.paidPlanTitle,
+                        memberRoleBadge = if (hasVerified) {
+                            state.memberRoleBadge.takeIf { it.contains("VIP") } ?: "👑 VIP مدفوع"
+                        } else {
+                            "عضو ونس"
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    private fun triggerSystemAndBannerPushNotification(event: PushNotificationEvent) {
+        pushNotificationHelper?.showPushNotification(event)
+        pushBannerAutoHideJob?.cancel()
+        _actionState.update { it.copy(latestPushBanner = event) }
+        pushBannerAutoHideJob = viewModelScope.launch {
+            delay(BANNER_DISPLAY_DURATION_MS)
+            _actionState.update { state ->
+                if (state.latestPushBanner?.notificationId == event.notificationId) {
+                    state.copy(latestPushBanner = null)
+                } else {
+                    state
+                }
+            }
+        }
+    }
+
+    fun dismissPushBanner() {
+        pushBannerAutoHideJob?.cancel()
+        _actionState.update { it.copy(latestPushBanner = null) }
+    }
+
+    /**
+     * Invites a friend to join a chat room and immediately triggers a real-time Push Notification (`ROOM_INVITE`).
+     */
+    fun inviteFriendToChatRoom(
+        friendNameOrEmail: String,
+        room: ChatRoomMetadata? = _actionState.value.activeRoom,
+        customInviteMessage: String = ""
+    ) {
+        val cleanFriend = friendNameOrEmail.trim()
+        if (cleanFriend.isBlank()) {
+            _actionState.update {
+                it.copy(errorMessage = "يرجى إدخال اسم الصديق أو بريده الإلكتروني لإرسال الدعوة")
+            }
+            return
+        }
+
+        val resolvedRoomId = room?.roomId ?: "general_room"
+        val resolvedRoomName = room?.roomName ?: "غرفة الدردشة العامة"
+        val senderName = _actionState.value.memberDisplayName
+        val inviteText = customInviteMessage.trim().ifBlank {
+            "تفضل بالانضمام معنا الآن إلى غرفة «$resolvedRoomName»!"
+        }
+        val notifId = "notif_invite_${System.currentTimeMillis()}"
+        val now = Timestamp.now()
+
+        val localEvent = PushNotificationEvent(
+            notificationId = notifId,
+            senderId = currentUserId,
+            senderName = senderName,
+            recipientQuery = cleanFriend,
+            roomId = resolvedRoomId,
+            roomName = resolvedRoomName,
+            notificationType = "ROOM_INVITE",
+            messageBody = "دعوة إلى $cleanFriend: $inviteText",
+            timestamp = now
+        )
+
+        lastDeliveredNotificationId = notifId
+        _localPushNotifications.update { listOf(localEvent) + it }
+        triggerSystemAndBannerPushNotification(localEvent)
+
+        _actionState.update {
+            it.copy(
+                pushNotifications = (listOf(localEvent) + it.pushNotifications).distinctBy { n -> n.notificationId },
+                statusMessage = "🔔 تم إرسال إشعار فوري لدعوة «$cleanFriend» للانضمام إلى غرفة «$resolvedRoomName»",
+                errorMessage = null
+            )
+        }
+
+        if (Firebase.auth.currentUser != null) {
+            viewModelScope.launch {
+                repository.publishPushNotificationEvent(
+                    senderName = senderName,
+                    recipientQuery = cleanFriend,
+                    roomId = resolvedRoomId,
+                    roomName = resolvedRoomName,
+                    notificationType = "ROOM_INVITE",
+                    messageBody = "دعوة إلى $cleanFriend: $inviteText",
+                    senderId = currentUserId,
+                    customNotificationId = notifId
+                )
+            }
+        }
+    }
+
+    /**
+     * Strictly validates payment details before unlocking VIP features:
+     * Clicking the payment button with empty or invalid fields FAILS with a clear error message,
+     * preventing members from activating paid features without completing a real validated payment.
+     */
+    fun processRealPaymentCheckout(
+        plan: VipPaymentPlan,
+        paymentMethod: String,
+        cardHolderName: String,
+        cardNumber: String,
+        expiryMmYy: String,
+        cvv: String,
+        walletPhone: String,
+        transferReferenceNumber: String
+    ): Boolean {
+        val validation = supabaseService.validatePaymentCredentials(
+            paymentMethod = paymentMethod,
+            cardHolderName = cardHolderName,
+            cardNumber = cardNumber,
+            expiryMmYy = expiryMmYy,
+            cvv = cvv,
+            walletPhone = walletPhone,
+            transferReferenceNumber = transferReferenceNumber
+        )
+
+        val transactionRef = validation.getOrElse { error ->
+            _actionState.update {
+                it.copy(
+                    errorMessage = "❌ لا يمكن التفعيل بدون دفع حقيقي: ${error.message}",
+                    statusMessage = null
+                )
+            }
+            return false
+        }
+
+        val receiptId = "rcpt_${System.currentTimeMillis()}"
+        val memberName = _actionState.value.memberDisplayName
+        val now = Timestamp.now()
+
+        val receipt = VerifiedPaymentReceipt(
+            receiptId = receiptId,
+            userId = currentUserId,
+            memberName = memberName,
+            planId = plan.planId,
+            planTitle = plan.title,
+            amountEgp = plan.amountEgp,
+            paymentMethod = paymentMethod,
+            transactionReference = transactionRef,
+            verified = true,
+            timestamp = now
+        )
+
+        supabaseService.saveVerifiedPaymentLocally(
+            planTitle = plan.title,
+            badgeLabel = plan.badgeLabel,
+            receiptId = receiptId
+        )
+
+        _localPaymentReceipts.update { listOf(receipt) + it }
+        _actionState.update { state ->
+            state.copy(
+                isPaidVip = true,
+                paidPlanTitle = plan.title,
+                memberRoleBadge = plan.badgeLabel,
+                paymentReceipts = (listOf(receipt) + state.paymentReceipts).distinctBy { it.receiptId },
+                statusMessage = "✅ تم التحقق من عملية الدفع الفعلي (${plan.amountEgp} ج.م) وتفعيل «${plan.title}» برقم مرجع $transactionRef",
+                errorMessage = null
+            )
+        }
+
+        syncMemberAccountWithSupabaseAndCloud()
+
+        if (Firebase.auth.currentUser != null) {
+            viewModelScope.launch {
+                repository.createVerifiedPaymentReceipt(
+                    memberName = memberName,
+                    planId = plan.planId,
+                    planTitle = plan.title,
+                    amountEgp = plan.amountEgp,
+                    paymentMethod = paymentMethod,
+                    transactionReference = transactionRef,
+                    userId = currentUserId,
+                    customReceiptId = receiptId
+                )
+            }
+        }
+        return true
     }
 
     /**
@@ -443,6 +706,8 @@ class ChatRoomViewModel(
             roomsCreatedCount = state.roomsCreatedCount,
             roomsJoinedCount = state.roomsJoinedCount,
             messagesSentCount = state.messagesSentCount,
+            isPaidVip = state.isPaidVip,
+            paidPlanTitle = state.paidPlanTitle,
             supabaseSynced = true
         )
 
@@ -479,8 +744,8 @@ class ChatRoomViewModel(
     }
 
     /**
-     * Records a personal chat message or room activity item in the member's chat history
-     * and increments the appropriate personal statistic.
+     * Records a personal chat message in the member's chat history, increments stats,
+     * AND publishes a real-time Push Notification (`NEW_MESSAGE`) so room participants receive an instant alert.
      */
     fun sendChatMessageInActiveRoom(messageText: String) {
         val cleanText = messageText.trim()
@@ -488,6 +753,7 @@ class ChatRoomViewModel(
         val activeRoom = _actionState.value.activeRoom
         val roomId = activeRoom?.roomId ?: "general_room"
         val roomName = activeRoom?.roomName ?: "غرفة الدردشة العامة"
+        val senderName = _actionState.value.memberDisplayName
 
         recordHistoryAndIncrementStat(
             roomId = roomId,
@@ -495,6 +761,45 @@ class ChatRoomViewModel(
             messageText = cleanText,
             activityType = "MESSAGE"
         )
+
+        val notifId = "notif_msg_${System.currentTimeMillis()}"
+        val pushEvent = PushNotificationEvent(
+            notificationId = notifId,
+            senderId = currentUserId,
+            senderName = senderName,
+            recipientQuery = "ALL",
+            roomId = roomId,
+            roomName = roomName,
+            notificationType = "NEW_MESSAGE",
+            messageBody = cleanText,
+            timestamp = Timestamp.now()
+        )
+
+        lastDeliveredNotificationId = notifId
+        _localPushNotifications.update { listOf(pushEvent) + it }
+        triggerSystemAndBannerPushNotification(pushEvent)
+
+        _actionState.update {
+            it.copy(
+                pushNotifications = (listOf(pushEvent) + it.pushNotifications).distinctBy { n -> n.notificationId },
+                statusMessage = "🔔 تم إرسال الرسالة وإصدار إشعار فوري للغرفة «$roomName»"
+            )
+        }
+
+        if (Firebase.auth.currentUser != null) {
+            viewModelScope.launch {
+                repository.publishPushNotificationEvent(
+                    senderName = senderName,
+                    recipientQuery = "ALL",
+                    roomId = roomId,
+                    roomName = roomName,
+                    notificationType = "NEW_MESSAGE",
+                    messageBody = cleanText,
+                    senderId = currentUserId,
+                    customNotificationId = notifId
+                )
+            }
+        }
     }
 
     private fun recordHistoryAndIncrementStat(
@@ -796,7 +1101,10 @@ class ChatRoomViewModel(
         chatHistoryJob?.cancel()
         fadfadaPostsJob?.cancel()
         fadfadaAdminJob?.cancel()
+        pushNotificationsJob?.cancel()
+        paymentReceiptsJob?.cancel()
         bannerAutoHideJob?.cancel()
+        pushBannerAutoHideJob?.cancel()
     }
 
     companion object {

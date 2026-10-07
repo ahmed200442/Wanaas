@@ -82,6 +82,8 @@ class ChatRoomRepository(private val db: FirebaseFirestore) {
         const val SUBCOLLECTION_PRESENCE_EVENTS = "presence_events"
         const val COLLECTION_FADFADA_POSTS = "fadfada_posts"
         const val COLLECTION_FADFADA_ADMIN_IDENTITIES = "fadfada_admin_identities"
+        const val COLLECTION_PUSH_NOTIFICATIONS = "push_notifications"
+        const val COLLECTION_PAYMENT_RECEIPTS = "payment_receipts"
         const val APP_OWNER_EMAIL = "hamadanagy1979@gmail.com"
     }
 
@@ -711,5 +713,175 @@ class ChatRoomRepository(private val db: FirebaseFirestore) {
             handleFirestoreError(e, OperationType.DELETE, "$COLLECTION_FADFADA_POSTS/$postId")
             Result.failure(e)
         }
+    }
+
+    /**
+     * Publishes a real-time push notification event (`/push_notifications/{notificationId}`)
+     * for either a new room message (`NEW_MESSAGE`) or a friend room invitation (`ROOM_INVITE`).
+     */
+    suspend fun publishPushNotificationEvent(
+        senderName: String,
+        recipientQuery: String = "ALL",
+        roomId: String,
+        roomName: String,
+        notificationType: String, // "NEW_MESSAGE" or "ROOM_INVITE"
+        messageBody: String,
+        senderId: String = requireUserId(),
+        customNotificationId: String? = null
+    ): Result<PushNotificationEvent> {
+        val cleanSenderName = senderName.trim().ifBlank { "عضو ونس" }
+        val cleanRecipient = recipientQuery.trim().ifBlank { "ALL" }
+        val cleanRoomId = roomId.trim().ifBlank { "general_room" }
+        val cleanRoomName = roomName.trim().ifBlank { "غرفة عامة" }
+        val cleanBody = messageBody.trim()
+        if (cleanBody.isEmpty()) {
+            return Result.failure(IllegalArgumentException("محتوى الإشعار لا يمكن أن يكون فارغاً"))
+        }
+
+        val docRef = if (!customNotificationId.isNullOrBlank()) {
+            db.collection(COLLECTION_PUSH_NOTIFICATIONS).document(customNotificationId)
+        } else {
+            db.collection(COLLECTION_PUSH_NOTIFICATIONS).document()
+        }
+
+        val payload = mapOf(
+            "notificationId" to docRef.id,
+            "senderId" to senderId,
+            "senderName" to cleanSenderName,
+            "recipientQuery" to cleanRecipient,
+            "roomId" to cleanRoomId,
+            "roomName" to cleanRoomName,
+            "notificationType" to notificationType,
+            "messageBody" to cleanBody,
+            "timestamp" to FieldValue.serverTimestamp()
+        )
+
+        return try {
+            docRef.set(payload).await()
+            val snapshot = docRef.get().await()
+            val created = snapshot.toObject(
+                PushNotificationEvent::class.java,
+                DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+            ) ?: PushNotificationEvent(
+                notificationId = docRef.id,
+                senderId = senderId,
+                senderName = cleanSenderName,
+                recipientQuery = cleanRecipient,
+                roomId = cleanRoomId,
+                roomName = cleanRoomName,
+                notificationType = notificationType,
+                messageBody = cleanBody
+            )
+            Result.success(created)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.CREATE, "$COLLECTION_PUSH_NOTIFICATIONS/${docRef.id}")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Real-time stream of push notifications (`/push_notifications`) for new messages and room invitations.
+     */
+    fun observePushNotifications(): Flow<List<PushNotificationEvent>> = callbackFlow {
+        val registration = db.collection(COLLECTION_PUSH_NOTIFICATIONS)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    handleFirestoreError(error, OperationType.LIST, COLLECTION_PUSH_NOTIFICATIONS)
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val events = snapshot?.toObjects(
+                    PushNotificationEvent::class.java,
+                    DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                )?.sortedByDescending { it.timestampMillis }.orEmpty()
+                trySend(events)
+            }
+        awaitClose { registration.remove() }
+    }
+
+    /**
+     * Records a verified payment receipt (`/payment_receipts/{receiptId}`) in Firestore
+     * after payment credentials have been strictly validated.
+     */
+    suspend fun createVerifiedPaymentReceipt(
+        memberName: String,
+        planId: String,
+        planTitle: String,
+        amountEgp: Int,
+        paymentMethod: String,
+        transactionReference: String,
+        userId: String = requireUserId(),
+        customReceiptId: String? = null
+    ): Result<VerifiedPaymentReceipt> {
+        val cleanMemberName = memberName.trim().ifBlank { "عضو ونس" }
+        val cleanPlanId = planId.trim().ifBlank { "vip_gold" }
+        val cleanPlanTitle = planTitle.trim().ifBlank { "باقة VIP الذهبية" }
+        val cleanRef = transactionReference.trim()
+
+        if (amountEgp <= 0 || cleanRef.length < 4) {
+            return Result.failure(IllegalArgumentException("بيانات إيصال الدفع غير مكتملة"))
+        }
+
+        val docRef = if (!customReceiptId.isNullOrBlank()) {
+            db.collection(COLLECTION_PAYMENT_RECEIPTS).document(customReceiptId)
+        } else {
+            db.collection(COLLECTION_PAYMENT_RECEIPTS).document()
+        }
+
+        val payload = mapOf(
+            "receiptId" to docRef.id,
+            "userId" to userId,
+            "memberName" to cleanMemberName,
+            "planId" to cleanPlanId,
+            "planTitle" to cleanPlanTitle,
+            "amountEgp" to amountEgp,
+            "paymentMethod" to paymentMethod,
+            "transactionReference" to cleanRef,
+            "verified" to true,
+            "timestamp" to FieldValue.serverTimestamp()
+        )
+
+        return try {
+            docRef.set(payload).await()
+            val snapshot = docRef.get().await()
+            val created = snapshot.toObject(
+                VerifiedPaymentReceipt::class.java,
+                DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+            ) ?: VerifiedPaymentReceipt(
+                receiptId = docRef.id,
+                userId = userId,
+                memberName = cleanMemberName,
+                planId = cleanPlanId,
+                planTitle = cleanPlanTitle,
+                amountEgp = amountEgp,
+                paymentMethod = paymentMethod,
+                transactionReference = cleanRef,
+                verified = true
+            )
+            Result.success(created)
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.CREATE, "$COLLECTION_PAYMENT_RECEIPTS/${docRef.id}")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Real-time stream of verified payment receipts for [userId].
+     */
+    fun observePaymentReceiptsForUser(userId: String = requireUserId()): Flow<List<VerifiedPaymentReceipt>> = callbackFlow {
+        val query = db.collection(COLLECTION_PAYMENT_RECEIPTS).whereEqualTo("userId", userId)
+        val registration = query.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                handleFirestoreError(error, OperationType.LIST, COLLECTION_PAYMENT_RECEIPTS)
+                close(error)
+                return@addSnapshotListener
+            }
+            val receipts = snapshot?.toObjects(
+                VerifiedPaymentReceipt::class.java,
+                DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+            )?.sortedByDescending { it.timestampMillis }.orEmpty()
+            trySend(receipts)
+        }
+        awaitClose { registration.remove() }
     }
 }

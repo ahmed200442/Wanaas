@@ -36,7 +36,7 @@ data class RoomActiveMember(
     val roomId: String = "",
     val memberName: String = "",
     val avatarEmoji: String = "👑",
-    val roleBadge: String = "VIP عضو",
+    val roleBadge: String = "عضو ونس",
     val supabaseLinked: Boolean = true,
     val joinedAt: Timestamp? = null
 ) {
@@ -136,3 +136,67 @@ data class FadfadaAdminIdentity(
     val timestampMillis: Long
         get() = timestamp?.toDate()?.time ?: 0L
 }
+
+/**
+ * Real-time Push Notification event (`/push_notifications/{notificationId}`)
+ * triggered when a user receives a new chat message (`NEW_MESSAGE`) or a friend room invitation (`ROOM_INVITE`).
+ */
+data class PushNotificationEvent(
+    val notificationId: String = "",
+    val senderId: String = "",
+    val senderName: String = "",
+    val recipientQuery: String = "ALL",
+    val roomId: String = "",
+    val roomName: String = "",
+    val notificationType: String = "NEW_MESSAGE", // "NEW_MESSAGE" or "ROOM_INVITE"
+    val messageBody: String = "",
+    val timestamp: Timestamp? = null
+) {
+    @get:Exclude
+    val timestampMillis: Long
+        get() = timestamp?.toDate()?.time ?: 0L
+
+    @get:Exclude
+    val isRoomInvite: Boolean
+        get() = notificationType.equals("ROOM_INVITE", ignoreCase = true)
+
+    @get:Exclude
+    val formattedTitle: String
+        get() = if (isRoomInvite) {
+            "📩 دعوة للانضمام إلى غرفة «$roomName»"
+        } else {
+            "💬 رسالة جديدة في غرفة «$roomName»"
+        }
+}
+
+/**
+ * Verified payment receipt (`/payment_receipts/{receiptId}`).
+ * Payment features are strictly locked until the member completes a validated payment.
+ */
+data class VerifiedPaymentReceipt(
+    val receiptId: String = "",
+    val userId: String = "",
+    val memberName: String = "",
+    val planId: String = "",
+    val planTitle: String = "",
+    val amountEgp: Int = 0,
+    val paymentMethod: String = "BANK_CARD", // "BANK_CARD", "VODAFONE_CASH", "INSTAPAY"
+    val transactionReference: String = "",
+    val verified: Boolean = false,
+    val timestamp: Timestamp? = null
+) {
+    @get:Exclude
+    val timestampMillis: Long
+        get() = timestamp?.toDate()?.time ?: 0L
+}
+
+/**
+ * Available paid VIP packages in the app.
+ */
+data class VipPaymentPlan(
+    val planId: String,
+    val title: String,
+    val badgeLabel: String,
+    val amountEgp: Int,
+    val description: String
+)

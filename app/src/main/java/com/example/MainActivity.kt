@@ -43,6 +43,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
@@ -50,6 +51,7 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MeetingRoom
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Sync
@@ -101,11 +103,14 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import coil.compose.AsyncImage
 import com.example.data.ChatRoomMetadata
 import com.example.data.ChatRoomRepository
+import com.example.data.PushNotificationEvent
 import com.example.data.RoomActiveMember
 import com.example.data.RoomPresenceBannerEvent
 import com.example.data.SupabaseAccountService
 import com.example.data.SupabaseMemberAccount
+import com.example.notifications.PushNotificationHelper
 import com.example.ui.screens.FadfadaAnonymousScreen
+import com.example.ui.screens.PushNotificationsAndPaymentScreen
 import com.example.ui.screens.UserProfileScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.WanasAmberGold
@@ -607,7 +612,8 @@ fun ChatRoomMetadataScreen(
                     currentUserId = currentUserId,
                     currentUserDisplayName = currentUserDisplayName,
                     currentUserEmail = currentUserEmail,
-                    supabaseService = SupabaseAccountService(app)
+                    supabaseService = SupabaseAccountService(app),
+                    pushNotificationHelper = PushNotificationHelper(app)
                 )
             }
         }
@@ -624,9 +630,11 @@ fun ChatRoomMetadataScreen(
     }
     var showProfileView by rememberSaveable { mutableStateOf(false) }
     var showFadfadaView by rememberSaveable { mutableStateOf(false) }
+    var showNotificationsPaymentView by rememberSaveable { mutableStateOf(false) }
+    var notificationsPaymentInitialTab by rememberSaveable { mutableStateOf(0) }
 
     // Handle system Back press when inside an active room
-    if (actionState.activeRoom != null && !showProfileView && !showFadfadaView) {
+    if (actionState.activeRoom != null && !showProfileView && !showFadfadaView && !showNotificationsPaymentView) {
         BackHandler {
             viewModel.leaveCurrentRoom()
         }
@@ -699,6 +707,40 @@ fun ChatRoomMetadataScreen(
                             viewModel.setAdminOwnerViewMode(enabled)
                         },
                         onBackToRooms = { showFadfadaView = false }
+                    )
+                }
+            } else if (showNotificationsPaymentView) {
+                val availableRooms = (roomsState as? UiState.Success<List<ChatRoomMetadata>>)?.data.orEmpty()
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    PushNotificationsAndPaymentScreen(
+                        actionState = actionState,
+                        availableRooms = availableRooms,
+                        isDarkMode = isDarkMode,
+                        initialTabIndex = notificationsPaymentInitialTab,
+                        onSendFriendInvitePush = { friend, room, msg ->
+                            viewModel.inviteFriendToChatRoom(friend, room, msg)
+                        },
+                        onSendRoomMessagePush = { msg ->
+                            viewModel.sendChatMessageInActiveRoom(msg)
+                        },
+                        onProcessRealPayment = { plan, method, holder, card, expiry, cvv, phone, ref ->
+                            viewModel.processRealPaymentCheckout(
+                                plan = plan,
+                                paymentMethod = method,
+                                cardHolderName = holder,
+                                cardNumber = card,
+                                expiryMmYy = expiry,
+                                cvv = cvv,
+                                walletPhone = phone,
+                                transferReferenceNumber = ref
+                            )
+                        },
+                        onBackToRooms = { showNotificationsPaymentView = false }
                     )
                 }
             } else {
@@ -950,6 +992,68 @@ fun ChatRoomMetadataScreen(
                                                 .testTag("save_member_name_button")
                                         ) {
                                             Text("تحديث", fontWeight = FontWeight.ExtraBold)
+                                        }
+                                    }
+
+                                    // Quick Actions: Push Notifications / Friend Invite & Real VIP Payment Checkout
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        FilledTonalButton(
+                                            onClick = {
+                                                notificationsPaymentInitialTab = 0
+                                                showNotificationsPaymentView = true
+                                            },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(42.dp)
+                                                .testTag("open_push_notifications_button"),
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = ButtonDefaults.filledTonalButtonColors(
+                                                containerColor = WanasAmberGold,
+                                                contentColor = Color(0xFF1A103C)
+                                            )
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.NotificationsActive,
+                                                contentDescription = "الإشعارات الفورية ودعوة صديق",
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "الإشعارات ودعوة صديق",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.ExtraBold
+                                            )
+                                        }
+
+                                        FilledTonalButton(
+                                            onClick = {
+                                                notificationsPaymentInitialTab = 1
+                                                showNotificationsPaymentView = true
+                                            },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(42.dp)
+                                                .testTag("open_real_payment_button"),
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = ButtonDefaults.filledTonalButtonColors(
+                                                containerColor = WanasEmeraldOnline,
+                                                contentColor = Color.White
+                                            )
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.CreditCard,
+                                                contentDescription = "الدفع الحقيقي VIP",
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = if (actionState.isPaidVip) "✅ باقة VIP مفعلة" else "الدفع الحقيقي VIP",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.ExtraBold
+                                            )
                                         }
                                     }
                                 }

@@ -137,6 +137,44 @@ class ChatRoomRepositoryRuleTest : FirestoreEmulatorTestBase() {
   }
 
   @Test
+  fun publishPushNotification_and_createVerifiedPaymentReceipt_succeedsAndEnforcesUserOwnership(): Unit = runBlocking {
+    val aliceUid = signInTestUser(ALICE_EMAIL)
+    val aliceRepo = ChatRoomRepository(firestore)
+    val customNotifId = "notif_${UUID.randomUUID().toString().replace("-", "")}"
+    val customReceiptId = "rcpt_${UUID.randomUUID().toString().replace("-", "")}"
+
+    val notifResult = withTimeout(DEFAULT_TIMEOUT_MS) {
+      aliceRepo.publishPushNotificationEvent(
+        senderName = "أحمد المصري",
+        recipientQuery = "محمد سامي",
+        roomId = "room_1",
+        roomName = ROOM_NAME,
+        notificationType = "ROOM_INVITE",
+        messageBody = "تعال انضم للغرفة",
+        senderId = aliceUid,
+        customNotificationId = customNotifId
+      )
+    }
+    assertTrue("publishPushNotificationEvent failed: ${notifResult.exceptionOrNull()}", notifResult.isSuccess)
+    assertTrue(notifResult.getOrThrow().isRoomInvite)
+
+    val receiptResult = withTimeout(DEFAULT_TIMEOUT_MS) {
+      aliceRepo.createVerifiedPaymentReceipt(
+        memberName = "أحمد المصري",
+        planId = "vip_gold_monthly",
+        planTitle = "باقة VIP الذهبية",
+        amountEgp = 150,
+        paymentMethod = "BANK_CARD",
+        transactionReference = "CARD-****-0366",
+        userId = aliceUid,
+        customReceiptId = customReceiptId
+      )
+    }
+    assertTrue("createVerifiedPaymentReceipt failed: ${receiptResult.exceptionOrNull()}", receiptResult.isSuccess)
+    assertTrue(receiptResult.getOrThrow().verified)
+  }
+
+  @Test
   fun getChatRoomById_crossUserAccess_failsWithPermissionDenied(): Unit = runBlocking {
     val aliceUid = signInTestUser(ALICE_EMAIL)
     val aliceRepo = ChatRoomRepository(firestore)

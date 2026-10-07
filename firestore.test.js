@@ -151,3 +151,61 @@ test("Anonymous Fadfada: regular members can read anonymous post but CANNOT read
   );
   await assertSucceeds(ownerDb.collection("fadfada_admin_identities").get());
 });
+
+test("Push Notifications & Verified Payment Receipts: authenticated user can publish push notification and create verified payment receipt", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  const now = new Date(Date.now() - 1000);
+
+  await assertSucceeds(
+    aliceDb.collection("push_notifications").doc("notif_1").set({
+      notificationId: "notif_1",
+      senderId: ALICE_UID,
+      senderName: "أحمد المصري",
+      recipientQuery: "محمد علي",
+      roomId: "room_alice",
+      roomName: "غرفة السهرة",
+      notificationType: "ROOM_INVITE",
+      messageBody: "تفضل معنا في الغرفة",
+      timestamp: now,
+    })
+  );
+
+  await assertSucceeds(bobDb.collection("push_notifications").doc("notif_1").get());
+
+  // Unverified payment receipt (verified: false) MUST fail
+  await assertFails(
+    aliceDb.collection("payment_receipts").doc("rcpt_unverified").set({
+      receiptId: "rcpt_unverified",
+      userId: ALICE_UID,
+      memberName: "أحمد المصري",
+      planId: "vip_gold_monthly",
+      planTitle: "باقة VIP الذهبية",
+      amountEgp: 150,
+      paymentMethod: "BANK_CARD",
+      transactionReference: "CARD-****-0366",
+      verified: false,
+      timestamp: now,
+    })
+  );
+
+  // Verified payment receipt (verified: true) succeeds for the user
+  await assertSucceeds(
+    aliceDb.collection("payment_receipts").doc("rcpt_1").set({
+      receiptId: "rcpt_1",
+      userId: ALICE_UID,
+      memberName: "أحمد المصري",
+      planId: "vip_gold_monthly",
+      planTitle: "باقة VIP الذهبية",
+      amountEgp: 150,
+      paymentMethod: "BANK_CARD",
+      transactionReference: "CARD-****-0366",
+      verified: true,
+      timestamp: now,
+    })
+  );
+
+  // Another regular user (Bob) cannot read Alice's private payment receipt
+  await assertFails(bobDb.collection("payment_receipts").doc("rcpt_1").get());
+});
+

@@ -105,6 +105,38 @@ service cloud.firestore {
              data.timestamp is timestamp && data.timestamp <= request.time;
     }
 
+    function isValidPushNotificationEvent(data) {
+      return data.notificationId is string && isValidId(data.notificationId) &&
+             data.senderId is string && isValidId(data.senderId) &&
+             data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 80 &&
+             data.recipientQuery is string && data.recipientQuery.size() >= 1 && data.recipientQuery.size() <= 160 &&
+             data.roomId is string && isValidId(data.roomId) &&
+             data.roomName is string && data.roomName.size() >= 1 && data.roomName.size() <= 120 &&
+             data.notificationType is string && (
+               data.notificationType == 'NEW_MESSAGE' ||
+               data.notificationType == 'ROOM_INVITE'
+             ) &&
+             data.messageBody is string && data.messageBody.size() >= 1 && data.messageBody.size() <= 500 &&
+             data.timestamp is timestamp && data.timestamp <= request.time;
+    }
+
+    function isValidPaymentReceipt(data) {
+      return data.receiptId is string && isValidId(data.receiptId) &&
+             data.userId is string && isValidId(data.userId) &&
+             data.memberName is string && data.memberName.size() >= 1 && data.memberName.size() <= 80 &&
+             data.planId is string && isValidId(data.planId) &&
+             data.planTitle is string && data.planTitle.size() >= 1 && data.planTitle.size() <= 100 &&
+             data.amountEgp is int && data.amountEgp > 0 &&
+             data.paymentMethod is string && (
+               data.paymentMethod == 'BANK_CARD' ||
+               data.paymentMethod == 'VODAFONE_CASH' ||
+               data.paymentMethod == 'INSTAPAY'
+             ) &&
+             data.transactionReference is string && data.transactionReference.size() >= 4 && data.transactionReference.size() <= 80 &&
+             data.verified == true &&
+             data.timestamp is timestamp && data.timestamp <= request.time;
+    }
+
     // 4. Chat Rooms Collection (/chat_rooms/{roomId})
     match /chat_rooms/{roomId} {
       allow get: if isSignedIn() &&
@@ -232,7 +264,6 @@ service cloud.firestore {
     }
 
     // 6. Anonymous Fadfada (Venting) Public Posts (/fadfada_posts/{postId})
-    // Contains NO author name or email so regular members only see anonymous posts.
     match /fadfada_posts/{postId} {
       allow get: if isSignedIn() && isValidId(postId);
       allow list: if isSignedIn();
@@ -263,7 +294,6 @@ service cloud.firestore {
     }
 
     // 7. Admin-Only Fadfada Author Identity Records (/fadfada_admin_identities/{postId})
-    // Regular members can submit their identity record when posting, but ONLY the app owner/admin can read/list it.
     match /fadfada_admin_identities/{postId} {
       allow get: if isAdmin() && isValidId(postId);
       allow list: if isAdmin();
@@ -279,5 +309,45 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if isAdmin() && isValidId(postId);
     }
+
+    // 8. Push Notifications (/push_notifications/{notificationId})
+    match /push_notifications/{notificationId} {
+      allow get: if isSignedIn() && isValidId(notificationId);
+      allow list: if isSignedIn();
+
+      allow create: if isSignedIn() &&
+                       isValidId(notificationId) &&
+                       incoming().notificationId == notificationId &&
+                       incoming().senderId == request.auth.uid &&
+                       incoming().keys().hasAll(['notificationId', 'senderId', 'senderName', 'recipientQuery', 'roomId', 'roomName', 'notificationType', 'messageBody', 'timestamp']) &&
+                       incoming().keys().hasOnly(['notificationId', 'senderId', 'senderName', 'recipientQuery', 'roomId', 'roomName', 'notificationType', 'messageBody', 'timestamp']) &&
+                       isValidPushNotificationEvent(incoming());
+
+      allow update: if false;
+      allow delete: if isSignedIn() &&
+                       isValidId(notificationId) &&
+                       (existing().senderId == request.auth.uid || isAdmin());
+    }
+
+    // 9. Verified Payment Receipts (/payment_receipts/{receiptId})
+    match /payment_receipts/{receiptId} {
+      allow get: if isSignedIn() &&
+                    isValidId(receiptId) &&
+                    (existing().userId == request.auth.uid || isAdmin());
+
+      allow list: if isSignedIn() &&
+                     (existing().userId == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(receiptId) &&
+                       incoming().receiptId == receiptId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['receiptId', 'userId', 'memberName', 'planId', 'planTitle', 'amountEgp', 'paymentMethod', 'transactionReference', 'verified', 'timestamp']) &&
+                       incoming().keys().hasOnly(['receiptId', 'userId', 'memberName', 'planId', 'planTitle', 'amountEgp', 'paymentMethod', 'transactionReference', 'verified', 'timestamp']) &&
+                       isValidPaymentReceipt(incoming());
+
+      allow update, delete: if false;
+    }
+
   }
 }
