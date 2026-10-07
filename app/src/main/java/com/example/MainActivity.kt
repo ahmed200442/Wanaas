@@ -112,6 +112,7 @@ import com.example.notifications.PushNotificationHelper
 import com.example.ui.screens.FadfadaAnonymousScreen
 import com.example.ui.screens.PushNotificationsAndPaymentScreen
 import com.example.ui.screens.UserProfileScreen
+import com.example.ui.screens.WanasV4HubScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.WanasAmberGold
 import com.example.ui.theme.WanasCardBg
@@ -631,10 +632,11 @@ fun ChatRoomMetadataScreen(
     var showProfileView by rememberSaveable { mutableStateOf(false) }
     var showFadfadaView by rememberSaveable { mutableStateOf(false) }
     var showNotificationsPaymentView by rememberSaveable { mutableStateOf(false) }
+    var showV4View by rememberSaveable { mutableStateOf(false) }
     var notificationsPaymentInitialTab by rememberSaveable { mutableStateOf(0) }
 
     // Handle system Back press when inside an active room
-    if (actionState.activeRoom != null && !showProfileView && !showFadfadaView && !showNotificationsPaymentView) {
+    if (actionState.activeRoom != null && !showProfileView && !showFadfadaView && !showNotificationsPaymentView && !showV4View) {
         BackHandler {
             viewModel.leaveCurrentRoom()
         }
@@ -664,7 +666,12 @@ fun ChatRoomMetadataScreen(
                 .background(screenBackgroundBrush)
                 .padding(innerPadding)
         ) {
-            if (showProfileView) {
+            if (showV4View) {
+                WanasV4HubScreen(
+                    currentUserName = actionState.memberDisplayName.ifBlank { currentUserDisplayName },
+                    onBack = { showV4View = false }
+                )
+            } else if (showProfileView) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -993,6 +1000,25 @@ fun ChatRoomMetadataScreen(
                                         ) {
                                             Text("تحديث", fontWeight = FontWeight.ExtraBold)
                                         }
+                                    }
+
+                                    // V4 Modern Hub: AI + Smart Rooms + Messenger + Games + Friends + Voice + Economy
+                                    FilledTonalButton(
+                                        onClick = { showV4View = true },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(46.dp)
+                                            .testTag("open_v4_hub_button"),
+                                        shape = RoundedCornerShape(14.dp),
+                                        colors = ButtonDefaults.filledTonalButtonColors(
+                                            containerColor = WanasVioletAccent,
+                                            contentColor = Color.White
+                                        )
+                                    ) {
+                                        Text(
+                                            text = "✨ وَنَس V4 — AI • غرف ذكية • Messenger • ألعاب • أصدقاء",
+                                            fontWeight = FontWeight.ExtraBold
+                                        )
                                     }
 
                                     // Quick Actions: Push Notifications / Friend Invite & Real VIP Payment Checkout

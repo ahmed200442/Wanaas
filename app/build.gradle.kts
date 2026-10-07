@@ -16,8 +16,8 @@ android {
     applicationId = "com.aistudio.wanas.vxhpqr"
     minSdk = 24
     targetSdk = 36
-    versionCode = 14
-    versionName = "3.2"
+    versionCode = 40
+    versionName = "4.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -87,6 +87,7 @@ dependencies {
   implementation(libs.coil.compose)
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.auth)
+  implementation(libs.firebase.ai)
   implementation(libs.androidx.credentials)
   implementation(libs.androidx.credentials.play.services)
   implementation(libs.googleid)
