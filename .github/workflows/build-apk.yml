@@ -34,9 +34,14 @@ jobs:
           gradle-version: '9.3.1'
 
       - name: Prepare Keystore & Environment Files
+        shell: bash
         run: |
+          set -euo pipefail
           if [ -f "debug.keystore.base64" ] && [ ! -f "debug.keystore" ]; then
             base64 -d debug.keystore.base64 > debug.keystore
+          fi
+          if [ ! -f "debug.keystore" ]; then
+            keytool -genkeypair -v               -keystore debug.keystore               -storepass android               -keypass android               -alias androiddebugkey               -keyalg RSA               -keysize 2048               -validity 10000               -dname "CN=Android Debug,O=Android,C=US"
           fi
           if [ ! -f ".env" ] && [ -f ".env.example" ]; then
             cp .env.example .env
