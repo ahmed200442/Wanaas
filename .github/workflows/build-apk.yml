@@ -1,0 +1,67 @@
+name: Build & Release Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Prepare Keystore & Environment Files
+        run: |
+          if [ -f "debug.keystore.base64" ] && [ ! -f "debug.keystore" ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
+          if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+            cp .env.example .env
+          fi
+
+      - name: Build Debug APK
+        run: gradle assembleDebug --no-daemon
+
+      - name: Prepare APK for Download
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk ./wanas-latest.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wanas-android-apk
+          path: wanas-latest.apk
+
+      - name: Create or Update GitHub Release with Direct APK Link
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "أحدث نسخة من تطبيق وَنَس (APK)"
+          body: |
+            ### 📲 رابط تحميل تطبيق وَنَس (APK) المباشر
+            اضغط على ملف **`wanas-latest.apk`** بالأسفل لتحميل وتثبيت أحدث نسخة من التطبيق مباشرة على هاتفك.
+          files: wanas-latest.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
