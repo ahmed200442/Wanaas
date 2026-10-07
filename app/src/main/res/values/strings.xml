@@ -6,4 +6,5 @@
     <string name="creator_id_label">معرف المنشئ (Creator ID)</string>
     <string name="create_room_button">حفظ الغرفة في Firestore</string>
     <string name="sign_in_google_button">تسجيل الدخول عبر Google</string>
+    <string name="default_web_client_id">442124174248-1e1gdvjpg7mc3sfrmjbj07mukp032m4b.apps.googleusercontent.com</string>
 </resources>
