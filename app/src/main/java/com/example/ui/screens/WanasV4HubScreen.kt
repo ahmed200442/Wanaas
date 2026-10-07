@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -83,6 +84,7 @@ fun WanasV4HubScreen(currentUserName: String, onBack: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WanasV4Home(currentUserName: String, onBack: () -> Unit, onOpen: (String) -> Unit) {
     val features = listOf(
@@ -153,6 +155,7 @@ private fun WanasV4Home(currentUserName: String, onBack: () -> Unit, onOpen: (St
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WanasV4FeatureScreen(feature: String, currentUserName: String, onBack: () -> Unit) {
     Scaffold(topBar = {
