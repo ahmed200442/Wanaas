@@ -40,9 +40,10 @@ jobs:
           if [ ! -f "debug.keystore" ]; then
             keytool -genkeypair -v -keystore debug.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
-          if [ ! -f ".env" ] && [ -f ".env.example" ]; then
-            cp .env.example .env
-          fi
+          cat > .env <<'EOF'
+SUPABASE_URL=https://txpkrctvdtjcptotfqer.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR4cGtyY3R2ZHRqY3B0b3RmcWVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwNTMwMTYsImV4cCI6MjEwNjYyOTAxNn0._nCaFSgqzjiGFJW28G6Y5WJ68jp1oqkSnASVx7NJKog
+EOF
       - name: Build Debug APK
         run: gradle assembleDebug --no-daemon
       - name: Prepare APK for Download
