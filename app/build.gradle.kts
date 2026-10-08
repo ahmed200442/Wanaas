@@ -3,22 +3,20 @@ import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesS
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
-  // alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.secrets)
   alias(libs.plugins.google.services)
 }
 
 android {
   namespace = "com.example"
-  compileSdk = 36
+  compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
     applicationId = "com.aistudio.wanas.vxhpqr"
     minSdk = 24
     targetSdk = 36
-    versionCode = 40
-    versionName = "4.0"
-
+    versionCode = 19
+    versionName = "Wanas-v3.3-real-online-voice"
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
@@ -40,21 +38,32 @@ android {
 
   buildTypes {
     release {
+      buildConfigField("String", "WANAS_TURN_URL", "\"\"")
+      buildConfigField("String", "WANAS_TURN_USERNAME", "\"\"")
+      buildConfigField("String", "WANAS_TURN_CREDENTIAL", "\"\"")
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    debug {
+      signingConfig = signingConfigs.getByName("debugConfig")
+      buildConfigField("String", "WANAS_TURN_URL", "\"\"")
+      buildConfigField("String", "WANAS_TURN_USERNAME", "\"\"")
+      buildConfigField("String", "WANAS_TURN_CREDENTIAL", "\"\"")
+    }
   }
+
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
   }
+
   buildFeatures {
     compose = true
     buildConfig = true
   }
+
   testOptions { unitTests { isIncludeAndroidResources = true } }
   dependenciesInfo {
     includeInApk = false
@@ -90,6 +99,8 @@ dependencies {
   implementation(libs.androidx.credentials)
   implementation(libs.androidx.credentials.play.services)
   implementation(libs.googleid)
+  implementation(libs.webrtc)
+  implementation(libs.okhttp)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
   testImplementation(libs.androidx.compose.ui.test.junit4)
