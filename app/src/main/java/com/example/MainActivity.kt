@@ -174,11 +174,24 @@ internal fun FirebaseAuth.authStateFlow(): Flow<FirebaseUser?> = callbackFlow {
 fun AppNavigation(
     isDarkMode: Boolean = false,
     onToggleTheme: () -> Unit = {},
-    auth: FirebaseAuth = Firebase.auth
+    auth: FirebaseAuth? = null
 ) {
     val context = LocalContext.current
     val supabaseService = remember(context) { SupabaseAccountService(context) }
-    val currentUser by auth.authStateFlow().collectAsStateWithLifecycle(initialValue = auth.currentUser)
+
+    // Firebase may be unavailable when google-services.json is intentionally
+    // omitted. Never evaluate Firebase.auth as a default parameter during the
+    // first composition because that can crash before the first frame.
+    val safeFirebaseAuth = remember {
+        auth ?: runCatching { Firebase.auth }.getOrNull()
+    }
+    val currentUser by if (safeFirebaseAuth != null) {
+        safeFirebaseAuth.authStateFlow().collectAsStateWithLifecycle(
+            initialValue = safeFirebaseAuth.currentUser
+        )
+    } else {
+        remember { mutableStateOf<FirebaseUser?>(null) }
+    }
 
     // Automatically restore saved member account on startup so the user enters directly without typing again
     var savedMemberAccount by remember {
