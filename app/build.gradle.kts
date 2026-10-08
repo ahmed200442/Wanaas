@@ -99,7 +99,7 @@ dependencies {
   implementation(libs.androidx.credentials)
   implementation(libs.androidx.credentials.play.services)
   implementation(libs.googleid)
-  implementation(libs.webrtc)
+  implementation("org.webrtc:google-webrtc:1.0.32006")
   implementation(libs.okhttp)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
