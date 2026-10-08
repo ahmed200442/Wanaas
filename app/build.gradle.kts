@@ -38,9 +38,9 @@ android {
 
   buildTypes {
     release {
-      buildConfigField("String", "WANAS_TURN_URL", """")
-      buildConfigField("String", "WANAS_TURN_USERNAME", """")
-      buildConfigField("String", "WANAS_TURN_CREDENTIAL", """")
+      buildConfigField("String", "WANAS_TURN_URL", "\"\"")
+      buildConfigField("String", "WANAS_TURN_USERNAME", "\"\"")
+      buildConfigField("String", "WANAS_TURN_CREDENTIAL", "\"\"")
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -48,9 +48,9 @@ android {
     }
     debug {
       signingConfig = signingConfigs.getByName("debugConfig")
-      buildConfigField("String", "WANAS_TURN_URL", """")
-      buildConfigField("String", "WANAS_TURN_USERNAME", """")
-      buildConfigField("String", "WANAS_TURN_CREDENTIAL", """")
+      buildConfigField("String", "WANAS_TURN_URL", "\"\"")
+      buildConfigField("String", "WANAS_TURN_USERNAME", "\"\"")
+      buildConfigField("String", "WANAS_TURN_CREDENTIAL", "\"\"")
     }
   }
 
