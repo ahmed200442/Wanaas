@@ -18,8 +18,6 @@ import kotlinx.coroutines.flow.update
 import org.webrtc.AudioSource
 import org.webrtc.AudioTrack
 import org.webrtc.DataChannel
-import org.webrtc.DefaultAudioDecoderFactory
-import org.webrtc.DefaultAudioEncoderFactory
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.MediaStream
@@ -78,8 +76,6 @@ class RealVoiceRoomEngine(
                     .createAudioDeviceModule()
                 factory = PeerConnectionFactory.builder()
                     .setAudioDeviceModule(adm)
-                    .setAudioEncoderFactory(DefaultAudioEncoderFactory(true, false, false))
-                    .setAudioDecoderFactory(DefaultAudioDecoderFactory())
                     .createPeerConnectionFactory()
                 return factory!!
             }
@@ -306,7 +302,6 @@ class RealVoiceRoomEngine(
             override fun onRenegotiationNeeded() {}
             override fun onAddTrack(receiver: RtpReceiver, mediaStreams: Array<out MediaStream>) {}
             override fun onStandardizedIceConnectionChange(newState: PeerConnection.IceConnectionState) {}
-            override fun onSelectedCandidatePairChanged(event: PeerConnection.CandidatePairChangeEvent) {}
         }) ?: return
 
         peers[peerId] = pc
@@ -370,7 +365,7 @@ class RealVoiceRoomEngine(
         }
     }
 
-    private class SimpleSdpObserver : org.webrtc.SdpObserver {
+    private open class SimpleSdpObserver : org.webrtc.SdpObserver {
         override fun onCreateSuccess(desc: SessionDescription) {}
         override fun onSetSuccess() {}
         override fun onCreateFailure(error: String) { Log.w(TAG, "SDP create failure: $error") }
